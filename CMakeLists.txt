@@ -14,6 +14,6 @@ set(CMAKE_AUTOUIC ON)
 find_package(Qt6 COMPONENTS Widgets REQUIRED)
 find_package(Tesseract 5.0.0 REQUIRED)
 
-add_executable(${PROJECT_NAME} main.cpp widget.cpp)
+add_executable(${PROJECT_NAME} WIN32 main.cpp widget.cpp)
 
 target_link_libraries(${PROJECT_NAME} PRIVATE Qt6::Widgets Tesseract::libtesseract)
