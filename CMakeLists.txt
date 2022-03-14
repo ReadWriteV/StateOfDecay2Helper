@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(Tesseract 5.0.0 REQUIRED)
 
-add_executable(${PROJECT_NAME} main.cpp)
+add_executable(${PROJECT_NAME} main.cpp main_window.cpp)
 
 set_target_properties(${PROJECT_NAME} PROPERTIES WIN32_EXECUTABLE true)
 target_compile_definitions(${PROJECT_NAME} PUBLIC UNICODE _UNICODE)

@@ -18,3 +18,6 @@ cmake ..
 
 cmake --build .
 ```
+
+## Qt 版本
+WIN32 API 版本仍在开发，可以查看 **Qt-version** 分支。
