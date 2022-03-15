@@ -6,12 +6,12 @@ INT WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, INT nCmdShow)
 {
     main_window win;
 
-    if (!win.Create(L"State of Decay Helper", WS_OVERLAPPEDWINDOW))
+    if (!win.create(L"State of Decay Helper"))
     {
         return 0;
     }
 
-    ShowWindow(win.Window(), nCmdShow);
+    ShowWindow(win.window(), nCmdShow);
 
     // Run the message loop.
 
