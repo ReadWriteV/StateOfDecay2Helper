@@ -2,7 +2,9 @@
 
 #include <Windows.h>
 
-constexpr int width = 400, height = 600;
+constexpr int client_width = 400, client_height = 600;
+constexpr int btn_w = 50, btn_h = 25, btn_x = 100, btn_y = 200;
+constexpr WORD start_button = 1001;
 
 extern HHOOK keyHook;
 
@@ -30,7 +32,7 @@ public:
             p = reinterpret_cast<main_window *>(pCreate->lpCreateParams);
             SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(p));
 
-            p->hwnd = hwnd;
+            p->h_main_window = hwnd;
         }
         else
         {
@@ -46,6 +48,8 @@ public:
         }
     }
 
+    main_window(HINSTANCE hInstance) : h_instance(hInstance) {}
+
     ~main_window()
     {
         UnhookWindowsHookEx(keyHook);
@@ -53,14 +57,25 @@ public:
 
     BOOL create(PCWSTR lpWindowName, DWORD dwStyle = WS_SYSMENU | WS_CAPTION | WS_MINIMIZEBOX, DWORD dwExStyle = WS_EX_TOPMOST,
                 int x = CW_USEDEFAULT, int y = CW_USEDEFAULT,
-                int nWidth = width, int nHeight = height,
-                HWND hWndParent = 0, HMENU hMenu = 0);
-    HWND window() const { return hwnd; }
+                int nWidth = client_width, int nHeight = client_height,
+                HWND hWndParent = nullptr, HMENU hMenu = nullptr);
+
+    HWND get_window_handle() const { return h_main_window; }
 
 protected:
+    void on_start_button_click();
+
+    BOOL save_file(LPCTSTR lpszFilePath, HBITMAP hBm);
+
+    void setup_ui();
+
     inline PCWSTR class_name() const { return L"State of Decay Helper"; }
     LRESULT handle_message(UINT uMsg, WPARAM wParam, LPARAM lParam);
 
 private:
-    HWND hwnd;
+    HINSTANCE h_instance;
+
+    HWND h_main_window;
+    HWND h_start_button;
+    HWND h_pause_button;
 };
