@@ -2,16 +2,18 @@
 
 #include <Windows.h>
 
+main_window *app_window = nullptr;
+
 INT WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, INT nCmdShow)
 {
-    main_window win(hInstance);
+    app_window = new main_window(hInstance);
 
-    if (!win.create(L"State of Decay Helper"))
+    if (!app_window->create(L"State of Decay Helper"))
     {
         return 0;
     }
 
-    ShowWindow(win.get_window_handle(), nCmdShow);
+    ShowWindow(app_window->get_window_handle(), nCmdShow);
 
     // Run the message loop.
 
@@ -21,5 +23,7 @@ INT WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, INT nCmdShow)
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
+
+    delete app_window;
     return 0;
 }

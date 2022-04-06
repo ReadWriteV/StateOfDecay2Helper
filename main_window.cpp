@@ -1,6 +1,52 @@
 #include "main_window.h"
 
+#include <opencv2/opencv.hpp>
+
 HHOOK keyHook;
+
+extern main_window *app_window;
+
+LRESULT CALLBACK main_window::keyProc(int nCode, WPARAM wParam, LPARAM lParam)
+{
+    KBDLLHOOKSTRUCT *pkbhs = reinterpret_cast<KBDLLHOOKSTRUCT *>(lParam);
+
+    if (pkbhs->vkCode == VK_ESCAPE)
+    {
+        // stop rolling
+    }
+    return CallNextHookEx(keyHook, nCode, wParam, lParam);
+}
+
+LRESULT CALLBACK main_window::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+{
+    main_window *p = nullptr;
+
+    if (uMsg == WM_NCCREATE)
+    {
+        CREATESTRUCT *pCreate = reinterpret_cast<CREATESTRUCT *>(lParam);
+        p = reinterpret_cast<main_window *>(pCreate->lpCreateParams);
+        SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(p));
+
+        p->h_main_window = hwnd;
+    }
+    else
+    {
+        p = reinterpret_cast<main_window *>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
+    }
+    if (p)
+    {
+        return p->handle_message(uMsg, wParam, lParam);
+    }
+    else
+    {
+        return DefWindowProc(hwnd, uMsg, wParam, lParam);
+    }
+}
+
+main_window::~main_window()
+{
+    UnhookWindowsHookEx(keyHook);
+}
 
 BOOL main_window::create(PCWSTR lpWindowName, DWORD dwStyle, DWORD dwExStyle, int x, int y, int nWidth, int nHeight, HWND hWndParent, HMENU hMenu)
 {
@@ -26,6 +72,12 @@ BOOL main_window::create(PCWSTR lpWindowName, DWORD dwStyle, DWORD dwExStyle, in
         rect_size.right - rect_size.left, rect_size.bottom - rect_size.top, hWndParent, hMenu, h_instance, this);
 
     keyHook = SetWindowsHookEx(WH_KEYBOARD_LL, main_window::keyProc, nullptr, 0);
+
+    if (ocr.Init("./tessdata", "chi_sim"))
+    {
+        MessageBox(h_main_window, L"Init tesseract failed!", L"info", MB_OK);
+        PostQuitMessage(0);
+    }
 
     return (h_main_window ? TRUE : FALSE);
 }
@@ -84,117 +136,44 @@ LRESULT main_window::handle_message(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 void main_window::on_start_button_click()
 {
+    SetWindowText(h_start_button, L"Pause (ESC)");
     HDC hdc = GetDC(NULL);
 
     int screenx = GetSystemMetrics(SM_CXSCREEN);
     int screeny = GetSystemMetrics(SM_CYSCREEN);
 
-    HBITMAP hBitmap = CreateCompatibleBitmap(hdc, screenx, screeny);
+    HBITMAP hBitmap = CreateCompatibleBitmap(hdc, t_w, t_h);
     HDC hdcMem = CreateCompatibleDC(hdc);
 
     SelectObject(hdcMem, hBitmap);
-    BitBlt(hdcMem, 0, 0, screenx, screeny, hdc, 0, 0, SRCCOPY);
-    save_file(L"./pic.bmp", hBitmap);
+    BitBlt(hdcMem, 0, 0, t_w, t_h, hdc, t_x, t_y, SRCCOPY);
+
+    unsigned char *image_data = new unsigned char[t_w * t_h * 4];
+
+    GetBitmapBits(hBitmap, t_w * t_h * 4, image_data);
+    cv::Mat image(t_h, t_w, CV_8UC4, image_data);
+    cv::Mat image_gray;
+    cv::cvtColor(image, image_gray, cv::COLOR_BGRA2GRAY);
+    cv::Mat dst;
+    cv::threshold(image_gray, dst, 70, 255, cv::THRESH_BINARY);
+
+    // cv::imshow("image.jpg", dst);
+    // cv::waitKey(0);
+
+    ocr.SetImage(dst.data, dst.cols, dst.rows, dst.channels(), dst.cols);
+    char *utf8_text = ocr.GetUTF8Text();
+
+    int wcscLen = MultiByteToWideChar(CP_UTF8, NULL, utf8_text, static_cast<int>(strlen(utf8_text)), NULL, 0);
+    wchar_t *wszcString = new wchar_t[wcscLen + 1];
+    MultiByteToWideChar(CP_UTF8, NULL, utf8_text, static_cast<int>(strlen(utf8_text)), wszcString, wcscLen);
+    wszcString[wcscLen] = '\0';
+    MessageBox(h_main_window, wszcString, L"info", MB_OK);
 
     ReleaseDC(h_main_window, hdcMem);
     ReleaseDC(h_main_window, hdc);
+    delete[] utf8_text;
+    delete[] wszcString;
+    delete image_data;
 
-    MessageBox(h_main_window, L"start button clicked!", L"info", MB_OK);
-}
-
-BOOL main_window::save_file(LPCTSTR lpszFilePath, HBITMAP hBm)
-{
-    //  定义位图文件表头
-    BITMAPFILEHEADER bmfh;
-    //  定义位图信息表头
-    BITMAPINFOHEADER bmih;
-
-    //  调色板长度
-    int nColorLen = 0;
-    //  调色表大小
-    DWORD dwRgbQuadSize = 0;
-    //  位图大小
-    DWORD dwBmSize = 0;
-    //  分配内存的指针
-    HGLOBAL hMem = NULL;
-
-    LPBITMAPINFOHEADER lpbi;
-
-    BITMAP bm;
-
-    HDC hDC;
-
-    HANDLE hFile = NULL;
-
-    DWORD dwWritten;
-
-    GetObject(hBm, sizeof(BITMAP), &bm);
-
-    bmih.biSize = sizeof(BITMAPINFOHEADER); // 本结构所占的字节
-    bmih.biWidth = bm.bmWidth;              // 位图宽
-    bmih.biHeight = bm.bmHeight;            // 位图高
-    bmih.biPlanes = 1;
-    bmih.biBitCount = bm.bmBitsPixel; // 每一图素的位数
-    bmih.biCompression = BI_RGB;      // 不压缩
-    bmih.biSizeImage = 0;             //  位图大小
-    bmih.biXPelsPerMeter = 0;
-    bmih.biYPelsPerMeter = 0;
-    bmih.biClrUsed = 0;
-    bmih.biClrImportant = 0;
-
-    //  计算位图图素数据区大小
-    dwBmSize = 4 * ((bm.bmWidth * bmih.biBitCount + 31) / 32) * bm.bmHeight;
-
-    //  如果图素位 <= 8bit，则有调色板
-    if (bmih.biBitCount <= 8)
-    {
-        nColorLen = (1 << bm.bmBitsPixel);
-    }
-
-    //  计算调色板大小
-    dwRgbQuadSize = nColorLen * sizeof(RGBQUAD);
-
-    //  分配内存
-    hMem = GlobalAlloc(GHND, dwBmSize + dwRgbQuadSize + sizeof(BITMAPINFOHEADER));
-
-    if (NULL == hMem)
-    {
-        return FALSE;
-    }
-
-    //  锁定内存
-    lpbi = (LPBITMAPINFOHEADER)GlobalLock(hMem);
-
-    //  将bmih中的内容写入分配的内存中
-    *lpbi = bmih;
-
-    hDC = GetDC(NULL);
-
-    //  将位图中的数据以bits的形式放入lpData中。
-    GetDIBits(hDC, hBm, 0, (DWORD)bmih.biHeight, (LPSTR)lpbi + sizeof(BITMAPINFOHEADER) + dwRgbQuadSize, (BITMAPINFO *)lpbi, (DWORD)DIB_RGB_COLORS);
-
-    bmfh.bfType = 0x4D42;                                                                         // 位图文件类型：BM
-    bmfh.bfSize = sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER) + dwRgbQuadSize + dwBmSize; // 位图大小
-    bmfh.bfReserved1 = 0;
-    bmfh.bfReserved2 = 0;
-    bmfh.bfOffBits = sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER) + dwRgbQuadSize; // 位图数据与文件头部的偏移量
-
-    //  把上面的数据写入文件中
-
-    hFile = CreateFile(lpszFilePath, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN, NULL);
-
-    if (INVALID_HANDLE_VALUE == hFile)
-    {
-        return FALSE;
-    }
-
-    //  写入位图文件头
-    WriteFile(hFile, (LPSTR)&bmfh, sizeof(BITMAPFILEHEADER), (DWORD *)&dwWritten, NULL);
-    //  写入位图数据
-    WriteFile(hFile, (LPBITMAPINFOHEADER)lpbi, bmfh.bfSize - sizeof(BITMAPFILEHEADER), (DWORD *)&dwWritten, NULL);
-
-    GlobalFree(hMem);
-    CloseHandle(hFile);
-
-    return TRUE;
+    // MessageBox(h_main_window, L"start button clicked!", L"info", MB_OK);
 }

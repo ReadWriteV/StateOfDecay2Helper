@@ -2,58 +2,25 @@
 
 #include <Windows.h>
 
-constexpr int client_width = 400, client_height = 600;
-constexpr int btn_w = 50, btn_h = 25, btn_x = 100, btn_y = 200;
+#include <tesseract/baseapi.h>
+
+constexpr int client_width = 300, client_height = 400;
+constexpr int btn_w = 100, btn_h = 50, btn_x = (client_width - btn_w) / 2, btn_y = 200;
 constexpr WORD start_button = 1001;
 
-extern HHOOK keyHook;
+constexpr int t_x = 1580, t_y = 290, t_w = 200, t_h = 125;
+constexpr int p_x = 1572, p_y = 804;
 
 class main_window
 {
 public:
-    static LRESULT CALLBACK keyProc(int nCode, WPARAM wParam, LPARAM lParam)
-    {
-        KBDLLHOOKSTRUCT *pkbhs = reinterpret_cast<KBDLLHOOKSTRUCT *>(lParam);
+    static LRESULT CALLBACK keyProc(int nCode, WPARAM wParam, LPARAM lParam);
 
-        if (pkbhs->vkCode == VK_ESCAPE)
-        {
-            // stop rolling
-        }
-        return CallNextHookEx(keyHook, nCode, wParam, lParam);
-    }
-
-    static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
-    {
-        main_window *p = nullptr;
-
-        if (uMsg == WM_NCCREATE)
-        {
-            CREATESTRUCT *pCreate = reinterpret_cast<CREATESTRUCT *>(lParam);
-            p = reinterpret_cast<main_window *>(pCreate->lpCreateParams);
-            SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(p));
-
-            p->h_main_window = hwnd;
-        }
-        else
-        {
-            p = reinterpret_cast<main_window *>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
-        }
-        if (p)
-        {
-            return p->handle_message(uMsg, wParam, lParam);
-        }
-        else
-        {
-            return DefWindowProc(hwnd, uMsg, wParam, lParam);
-        }
-    }
+    static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
     main_window(HINSTANCE hInstance) : h_instance(hInstance) {}
 
-    ~main_window()
-    {
-        UnhookWindowsHookEx(keyHook);
-    }
+    ~main_window();
 
     BOOL create(PCWSTR lpWindowName, DWORD dwStyle = WS_SYSMENU | WS_CAPTION | WS_MINIMIZEBOX, DWORD dwExStyle = WS_EX_TOPMOST,
                 int x = CW_USEDEFAULT, int y = CW_USEDEFAULT,
@@ -64,8 +31,6 @@ public:
 
 protected:
     void on_start_button_click();
-
-    BOOL save_file(LPCTSTR lpszFilePath, HBITMAP hBm);
 
     void setup_ui();
 
@@ -78,4 +43,6 @@ private:
     HWND h_main_window;
     HWND h_start_button;
     HWND h_pause_button;
+
+    tesseract::TessBaseAPI ocr;
 };
