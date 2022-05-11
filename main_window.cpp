@@ -1,6 +1,4 @@
-#include "main_window.h"
-
-#include <opencv2/opencv.hpp>
+﻿#include "main_window.h"
 
 HHOOK keyHook;
 
@@ -45,7 +43,11 @@ LRESULT CALLBACK main_window::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LP
 
 main_window::~main_window()
 {
-    UnhookWindowsHookEx(keyHook);
+    // UnhookWindowsHookEx(keyHook);
+    if (preview_image)
+    {
+        DeleteObject(preview_image);
+    }
 }
 
 BOOL main_window::create(PCWSTR lpWindowName, DWORD dwStyle, DWORD dwExStyle, int x, int y, int nWidth, int nHeight, HWND hWndParent, HMENU hMenu)
@@ -54,6 +56,7 @@ BOOL main_window::create(PCWSTR lpWindowName, DWORD dwStyle, DWORD dwExStyle, in
 
     wc.lpfnWndProc = main_window::WindowProc;
     wc.hInstance = h_instance;
+    wc.hIcon = LoadIcon(NULL, IDI_APPLICATION);
     wc.lpszClassName = class_name();
 
     RegisterClass(&wc);
@@ -71,7 +74,7 @@ BOOL main_window::create(PCWSTR lpWindowName, DWORD dwStyle, DWORD dwExStyle, in
         dwExStyle, class_name(), lpWindowName, dwStyle, x, y,
         rect_size.right - rect_size.left, rect_size.bottom - rect_size.top, hWndParent, hMenu, h_instance, this);
 
-    keyHook = SetWindowsHookEx(WH_KEYBOARD_LL, main_window::keyProc, nullptr, 0);
+    // keyHook = SetWindowsHookEx(WH_KEYBOARD_LL, main_window::keyProc, nullptr, 0);
 
     if (ocr.Init("./tessdata", "chi_sim"))
     {
@@ -84,6 +87,32 @@ BOOL main_window::create(PCWSTR lpWindowName, DWORD dwStyle, DWORD dwExStyle, in
 
 void main_window::setup_ui()
 {
+    h_preview_box = CreateWindow(
+        L"STATIC",
+        NULL,
+        WS_VISIBLE | WS_CHILD | WS_BORDER | SS_BITMAP, // Styles
+        pre_box_x,                                     // x position
+        pre_box_y,                                     // y position
+        pre_box_w,                                     // width
+        pre_box_h,                                     // height
+        h_main_window,                                 // Parent window
+        reinterpret_cast<HMENU>(preview_box),
+        h_instance,
+        NULL);
+
+    h_text_box = CreateWindow(
+        L"STATIC",
+        L"Result ...",
+        WS_VISIBLE | WS_CHILD | WS_BORDER, // Styles
+        pre_box_x,                         // x position
+        pre_box_y + pre_box_h + 10,        // y position
+        pre_box_w,                         // width
+        pre_box_h,                         // height
+        h_main_window,                     // Parent window
+        NULL,
+        h_instance,
+        NULL);
+
     h_start_button = CreateWindow(
         L"BUTTON",                             // Predefined class; Unicode assumed
         L"START",                              // Button text
@@ -96,6 +125,19 @@ void main_window::setup_ui()
         reinterpret_cast<HMENU>(start_button),
         h_instance,
         NULL);
+
+    h_close_button = CreateWindow(
+        L"BUTTON",                             // Predefined class; Unicode assumed
+        L"CLOSE",                              // Button text
+        WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON, // Styles
+        btn_x + btn_w + 20,                    // x position
+        btn_y,                                 // y position
+        btn_w,                                 // Button width
+        btn_h,                                 // Button height
+        h_main_window,                         // Parent window
+        reinterpret_cast<HMENU>(close_button),
+        h_instance,
+        NULL);
 }
 
 LRESULT main_window::handle_message(UINT uMsg, WPARAM wParam, LPARAM lParam)
@@ -104,19 +146,19 @@ LRESULT main_window::handle_message(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
     case WM_CREATE:
         setup_ui();
-        return TRUE;
+        return 0;
 
     case WM_DESTROY:
         PostQuitMessage(0);
-        return TRUE;
+        return 0;
 
     case WM_PAINT:
     {
         PAINTSTRUCT ps;
         HDC hdc = BeginPaint(h_main_window, &ps);
-        FillRect(hdc, &ps.rcPaint, (HBRUSH)(COLOR_GRAYTEXT + 1));
+        // FillRect(hdc, &ps.rcPaint, (HBRUSH)(COLOR_GRAYTEXT + 1));
         EndPaint(h_main_window, &ps);
-        return TRUE;
+        return 0;
     }
 
     case WM_COMMAND:
@@ -125,22 +167,27 @@ LRESULT main_window::handle_message(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
             on_start_button_click();
         }
-        return TRUE;
+        else if (LOWORD(wParam) == close_button)
+        {
+            PostQuitMessage(0);
+        }
+        return 0;
     }
 
     default:
         return DefWindowProc(h_main_window, uMsg, wParam, lParam);
     }
-    return TRUE;
+    return DefWindowProc(h_main_window, uMsg, wParam, lParam);
 }
 
 void main_window::on_start_button_click()
 {
-    SetWindowText(h_start_button, L"Pause (ESC)");
+    // SetWindowText(h_start_button, L"Pause (ESC)");
+
     HDC hdc = GetDC(NULL);
 
-    int screenx = GetSystemMetrics(SM_CXSCREEN);
-    int screeny = GetSystemMetrics(SM_CYSCREEN);
+    // int screenx = GetSystemMetrics(SM_CXSCREEN);
+    // int screeny = GetSystemMetrics(SM_CYSCREEN);
 
     HBITMAP hBitmap = CreateCompatibleBitmap(hdc, t_w, t_h);
     HDC hdcMem = CreateCompatibleDC(hdc);
@@ -148,32 +195,50 @@ void main_window::on_start_button_click()
     SelectObject(hdcMem, hBitmap);
     BitBlt(hdcMem, 0, 0, t_w, t_h, hdc, t_x, t_y, SRCCOPY);
 
-    unsigned char *image_data = new unsigned char[t_w * t_h * 4];
+    BITMAP bm;
+    GetObject(hBitmap, sizeof(bm), &bm);
+    if (bm.bmBitsPixel == 32)
+    {
+        SetWindowText(h_text_box, L"32 BitsPixel");
+    }
 
-    GetBitmapBits(hBitmap, t_w * t_h * 4, image_data);
-    cv::Mat image(t_h, t_w, CV_8UC4, image_data);
-    cv::Mat image_gray;
-    cv::cvtColor(image, image_gray, cv::COLOR_BGRA2GRAY);
-    cv::Mat dst;
-    cv::threshold(image_gray, dst, 70, 255, cv::THRESH_BINARY);
+    // note: 24bit bmp image
+    // HBITMAP hBitmap = reinterpret_cast<HBITMAP>(LoadImage(NULL, L"m.bmp", IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE));
+
+    // TODO: convert 32bit bitmap to 1 bit gray image
+
+    HBITMAP hold = reinterpret_cast<HBITMAP>(SendMessage(h_preview_box, STM_SETIMAGE, IMAGE_BITMAP, reinterpret_cast<LPARAM>(hBitmap)));
+
+    // clear the old image
+    if (hold && hold != hBitmap)
+    {
+        DeleteObject(hold);
+    }
+
+    // unsigned char *image_data = new unsigned char[t_w * t_h * 4];
+
+    // GetBitmapBits(hBitmap, t_w * t_h * 4, image_data);
+    // cv::Mat image(t_h, t_w, CV_8UC4, image_data);
+    // cv::Mat image_gray;
+    // cv::cvtColor(image, image_gray, cv::COLOR_BGRA2GRAY);
+    // cv::Mat dst;
+    // cv::threshold(image_gray, dst, 70, 255, cv::THRESH_BINARY);
 
     // cv::imshow("image.jpg", dst);
     // cv::waitKey(0);
 
-    ocr.SetImage(dst.data, dst.cols, dst.rows, dst.channels(), dst.cols);
-    char *utf8_text = ocr.GetUTF8Text();
+    // ocr.SetImage(dst.data, dst.cols, dst.rows, dst.channels(), dst.cols);
+    // char *utf8_text = ocr.GetUTF8Text();
 
-    int wcscLen = MultiByteToWideChar(CP_UTF8, NULL, utf8_text, static_cast<int>(strlen(utf8_text)), NULL, 0);
-    wchar_t *wszcString = new wchar_t[wcscLen + 1];
-    MultiByteToWideChar(CP_UTF8, NULL, utf8_text, static_cast<int>(strlen(utf8_text)), wszcString, wcscLen);
-    wszcString[wcscLen] = '\0';
-    MessageBox(h_main_window, wszcString, L"info", MB_OK);
+    // int wcscLen = MultiByteToWideChar(CP_UTF8, NULL, utf8_text, static_cast<int>(strlen(utf8_text)), NULL, 0);
+    // wchar_t *wszcString = new wchar_t[wcscLen + 1];
+    // MultiByteToWideChar(CP_UTF8, NULL, utf8_text, static_cast<int>(strlen(utf8_text)), wszcString, wcscLen);
+    // wszcString[wcscLen] = '\0';
+    // MessageBox(h_main_window, wszcString, L"info", MB_OK);
 
+    DeleteObject(hBitmap);
     ReleaseDC(h_main_window, hdcMem);
     ReleaseDC(h_main_window, hdc);
-    delete[] utf8_text;
-    delete[] wszcString;
-    delete image_data;
-
-    // MessageBox(h_main_window, L"start button clicked!", L"info", MB_OK);
+    // delete[] utf8_text;
+    // delete[] wszcString;
 }

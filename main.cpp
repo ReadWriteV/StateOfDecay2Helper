@@ -1,4 +1,4 @@
-#include "main_window.h"
+﻿#include "main_window.h"
 
 #include <Windows.h>
 
@@ -13,7 +13,7 @@ INT WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, INT nCmdShow)
         return 0;
     }
 
-    ShowWindow(app_window->get_window_handle(), nCmdShow);
+    app_window->show_window(nCmdShow);
 
     // Run the message loop.
 
