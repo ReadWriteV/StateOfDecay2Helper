@@ -211,6 +211,7 @@ void main_window::on_start_button_click()
     // HBITMAP hBitmap = reinterpret_cast<HBITMAP>(LoadImage(NULL, L"m.bmp", IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE));
 
     // convert 32bit bitmap to 1 bit gray image in image_bits
+    // there is a problem during transform 32bit bitmap to 1 bit gray image
     for (std::size_t row = 0; row < bm.bmHeight; row++)
     {
         for (std::size_t col = 0; col < bm.bmWidth; col++)
