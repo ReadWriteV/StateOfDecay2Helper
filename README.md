@@ -10,11 +10,7 @@
 
 ``` bash
 
-mkdir build
-
-cd build
-
-cmake ..
+cmake -S . -B build
 
 cmake --build .
 ```

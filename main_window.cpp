@@ -1,5 +1,7 @@
 ﻿#include "main_window.h"
 
+#include <memory>
+
 HHOOK keyHook;
 
 extern main_window *app_window;
@@ -11,6 +13,7 @@ LRESULT CALLBACK main_window::keyProc(int nCode, WPARAM wParam, LPARAM lParam)
     if (pkbhs->vkCode == VK_ESCAPE)
     {
         // stop rolling
+        // app_window->stop_rolling();
     }
     return CallNextHookEx(keyHook, nCode, wParam, lParam);
 }
@@ -41,13 +44,13 @@ LRESULT CALLBACK main_window::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LP
     }
 }
 
+main_window::main_window(HINSTANCE hInstance) : h_instance(hInstance)
+{
+}
+
 main_window::~main_window()
 {
     // UnhookWindowsHookEx(keyHook);
-    if (preview_image)
-    {
-        DeleteObject(preview_image);
-    }
 }
 
 BOOL main_window::create(PCWSTR lpWindowName, DWORD dwStyle, DWORD dwExStyle, int x, int y, int nWidth, int nHeight, HWND hWndParent, HMENU hMenu)
@@ -89,7 +92,7 @@ void main_window::setup_ui()
 {
     h_preview_box = CreateWindow(
         L"STATIC",
-        NULL,
+        nullptr,
         WS_VISIBLE | WS_CHILD | WS_BORDER | SS_BITMAP, // Styles
         pre_box_x,                                     // x position
         pre_box_y,                                     // y position
@@ -98,7 +101,7 @@ void main_window::setup_ui()
         h_main_window,                                 // Parent window
         reinterpret_cast<HMENU>(preview_box),
         h_instance,
-        NULL);
+        nullptr);
 
     h_text_box = CreateWindow(
         L"STATIC",
@@ -109,9 +112,9 @@ void main_window::setup_ui()
         pre_box_w,                         // width
         pre_box_h,                         // height
         h_main_window,                     // Parent window
-        NULL,
+        nullptr,
         h_instance,
-        NULL);
+        nullptr);
 
     h_start_button = CreateWindow(
         L"BUTTON",                             // Predefined class; Unicode assumed
@@ -124,7 +127,7 @@ void main_window::setup_ui()
         h_main_window,                         // Parent window
         reinterpret_cast<HMENU>(start_button),
         h_instance,
-        NULL);
+        nullptr);
 
     h_close_button = CreateWindow(
         L"BUTTON",                             // Predefined class; Unicode assumed
@@ -137,7 +140,7 @@ void main_window::setup_ui()
         h_main_window,                         // Parent window
         reinterpret_cast<HMENU>(close_button),
         h_instance,
-        NULL);
+        nullptr);
 }
 
 LRESULT main_window::handle_message(UINT uMsg, WPARAM wParam, LPARAM lParam)
@@ -197,35 +200,48 @@ void main_window::on_start_button_click()
 
     BITMAP bm;
     GetObject(hBitmap, sizeof(bm), &bm);
-    if (bm.bmBitsPixel == 32)
-    {
-        SetWindowText(h_text_box, L"32 BitsPixel");
-    }
+
+    auto size = bm.bmHeight * bm.bmWidthBytes;
+
+    auto buffer = std::make_shared<unsigned char[]>(size);
+
+    auto retv = GetBitmapBits(hBitmap, size, buffer.get());
 
     // note: 24bit bmp image
     // HBITMAP hBitmap = reinterpret_cast<HBITMAP>(LoadImage(NULL, L"m.bmp", IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE));
 
-    // TODO: convert 32bit bitmap to 1 bit gray image
+    // convert 32bit bitmap to 1 bit gray image in image_bits
+    for (std::size_t row = 0; row < bm.bmHeight; row++)
+    {
+        for (std::size_t col = 0; col < bm.bmWidth; col++)
+        {
+            auto source_index = row * bm.bmWidthBytes + col * bm.bmBitsPixel / 8;
+            auto r = buffer[source_index];
+            auto g = buffer[source_index + 1];
+            auto b = buffer[source_index + 2];
 
-    HBITMAP hold = reinterpret_cast<HBITMAP>(SendMessage(h_preview_box, STM_SETIMAGE, IMAGE_BITMAP, reinterpret_cast<LPARAM>(hBitmap)));
+            auto target_index_x = col % 8;
+            if (0.3 * r + 0.59 * g + 0.11 * b > 100)
+            {
+                image_bits.at(row).at(col / 8) |= 0x00000001 << target_index_x;
+            }
+            else
+            {
+                image_bits.at(row).at(col / 8) &= 0x00000001 << target_index_x ^ 0x11111111;
+            }
+        }
+    }
 
-    // clear the old image
-    if (hold && hold != hBitmap)
+    // create preview image handle
+    HBITMAP preview_image = CreateBitmap(t_w, t_h, 1, 1, image_bits.data()->data());
+
+    HBITMAP hold = reinterpret_cast<HBITMAP>(SendMessage(h_preview_box, STM_SETIMAGE, IMAGE_BITMAP, reinterpret_cast<LPARAM>(preview_image)));
+
+    // delete the old image
+    if (hold && hold != preview_image)
     {
         DeleteObject(hold);
     }
-
-    // unsigned char *image_data = new unsigned char[t_w * t_h * 4];
-
-    // GetBitmapBits(hBitmap, t_w * t_h * 4, image_data);
-    // cv::Mat image(t_h, t_w, CV_8UC4, image_data);
-    // cv::Mat image_gray;
-    // cv::cvtColor(image, image_gray, cv::COLOR_BGRA2GRAY);
-    // cv::Mat dst;
-    // cv::threshold(image_gray, dst, 70, 255, cv::THRESH_BINARY);
-
-    // cv::imshow("image.jpg", dst);
-    // cv::waitKey(0);
 
     // ocr.SetImage(dst.data, dst.cols, dst.rows, dst.channels(), dst.cols);
     // char *utf8_text = ocr.GetUTF8Text();
