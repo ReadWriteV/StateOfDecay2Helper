@@ -1,12 +1,14 @@
 ﻿#include "main_window.h"
 
 #include <Windows.h>
+#include <memory>
 
-main_window *app_window = nullptr;
+main_window *app_window_ptr = nullptr;
 
 INT WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, INT nCmdShow)
 {
-    app_window = new main_window(hInstance);
+    auto app_window = std::make_unique<main_window>(hInstance);
+    app_window_ptr = app_window.get();
 
     if (!app_window->create(L"State of Decay Helper"))
     {
@@ -23,7 +25,5 @@ INT WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, INT nCmdShow)
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
-
-    delete app_window;
     return 0;
 }

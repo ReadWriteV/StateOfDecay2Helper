@@ -1,10 +1,11 @@
 ﻿#include "main_window.h"
 
 #include <memory>
+#include <fstream>
 
 HHOOK keyHook;
 
-extern main_window *app_window;
+extern main_window *app_window_ptr;
 
 LRESULT CALLBACK main_window::keyProc(int nCode, WPARAM wParam, LPARAM lParam)
 {
@@ -13,7 +14,7 @@ LRESULT CALLBACK main_window::keyProc(int nCode, WPARAM wParam, LPARAM lParam)
     if (pkbhs->vkCode == VK_ESCAPE)
     {
         // stop rolling
-        // app_window->stop_rolling();
+        // app_window_ptr->stop_rolling();
     }
     return CallNextHookEx(keyHook, nCode, wParam, lParam);
 }
@@ -203,7 +204,7 @@ void main_window::on_start_button_click()
 
     auto size = bm.bmHeight * bm.bmWidthBytes;
 
-    auto buffer = std::make_shared<unsigned char[]>(size);
+    auto buffer = std::make_unique<unsigned char[]>(size);
 
     auto retv = GetBitmapBits(hBitmap, size, buffer.get());
 
@@ -222,13 +223,13 @@ void main_window::on_start_button_click()
             auto b = buffer[source_index + 2];
 
             auto target_index_x = col % 8;
-            if (0.3 * r + 0.59 * g + 0.11 * b > 100)
+            if (0.3f * r + 0.59f * g + 0.11f * b > 75.0f)
             {
-                image_bits.at(row).at(col / 8) |= 0x00000001 << target_index_x;
+                image_bits.at(row).at(col / 8) |= 0x00000001 << (7 - target_index_x);
             }
             else
             {
-                image_bits.at(row).at(col / 8) &= 0x00000001 << target_index_x ^ 0x11111111;
+                image_bits.at(row).at(col / 8) &= 0x00000001 << (7 - target_index_x) ^ 0x11111111;
             }
         }
     }
