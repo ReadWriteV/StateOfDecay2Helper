@@ -245,18 +245,23 @@ void main_window::on_start_button_click()
         DeleteObject(hold);
     }
 
-    // ocr.SetImage(dst.data, dst.cols, dst.rows, dst.channels(), dst.cols);
-    // char *utf8_text = ocr.GetUTF8Text();
+    ocr.SetImage(buffer.get(), t_w, t_h, 4, 800);
+    std::unique_ptr<char[]> utf8_text(ocr.GetUTF8Text());
 
-    // int wcscLen = MultiByteToWideChar(CP_UTF8, NULL, utf8_text, static_cast<int>(strlen(utf8_text)), NULL, 0);
-    // wchar_t *wszcString = new wchar_t[wcscLen + 1];
-    // MultiByteToWideChar(CP_UTF8, NULL, utf8_text, static_cast<int>(strlen(utf8_text)), wszcString, wcscLen);
-    // wszcString[wcscLen] = '\0';
-    // MessageBox(h_main_window, wszcString, L"info", MB_OK);
+    std::ofstream log_file;
+    log_file.open("output.log", std::ios::app);
+    log_file << utf8_text << std::endl;
+    log_file.close();
+
+    // convert UTF8 text to wide char, and report ocr result in text box
+    int wcscLen = MultiByteToWideChar(CP_UTF8, 0, utf8_text.get(), static_cast<int>(strlen(utf8_text.get())), nullptr, 0);
+    std::unique_ptr<wchar_t[]> wszcString = std::make_unique<wchar_t[]>(wcscLen + 1);
+    MultiByteToWideChar(CP_UTF8, 0, utf8_text.get(), static_cast<int>(strlen(utf8_text.get())), wszcString.get(), wcscLen);
+    wszcString[wcscLen] = '\0';
+
+    SetWindowText(h_text_box, wszcString.get());
 
     DeleteObject(hBitmap);
     ReleaseDC(h_main_window, hdcMem);
     ReleaseDC(h_main_window, hdc);
-    // delete[] utf8_text;
-    // delete[] wszcString;
 }
