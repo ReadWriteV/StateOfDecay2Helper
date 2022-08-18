@@ -5,6 +5,8 @@
 #include <tesseract/baseapi.h>
 
 #include <array>
+#include <thread>
+#include <atomic>
 
 // define region
 constexpr int t_x = 1580, t_y = 290, t_w = 200, t_h = 125;
@@ -46,13 +48,18 @@ public:
                 HWND hWndParent = nullptr, HMENU hMenu = nullptr);
 
     HWND get_window_handle() const { return h_main_window; }
+    HHOOK get_hook_handle() const { return keyHook; }
 
     BOOL show_window(INT nCmdShow) const { return ShowWindow(h_main_window, nCmdShow); }
+
+    void stop_rolling();
 
 protected:
     void on_start_button_click();
 
     void setup_ui();
+
+    void rolling();
 
     inline PCWSTR class_name() const { return L"State of Decay Helper"; }
     LRESULT handle_message(UINT uMsg, WPARAM wParam, LPARAM lParam);
@@ -67,6 +74,11 @@ private:
     HWND h_preview_box;
     HWND h_text_box;
 
+    HHOOK keyHook;
+
+    std::atomic_bool is_rolling;
+    std::atomic_bool is_running;
+    std::thread rolling_thread;
     tesseract::TessBaseAPI ocr;
 
     std::array<std::array<unsigned char, t_w / 8 + 1>, t_h> image_bits;

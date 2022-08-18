@@ -3,20 +3,19 @@
 #include <memory>
 #include <fstream>
 
-HHOOK keyHook;
-
 extern main_window *app_window_ptr;
 
 LRESULT CALLBACK main_window::keyProc(int nCode, WPARAM wParam, LPARAM lParam)
 {
     KBDLLHOOKSTRUCT *pkbhs = reinterpret_cast<KBDLLHOOKSTRUCT *>(lParam);
 
+    // press ESC to stop rolling
     if (pkbhs->vkCode == VK_ESCAPE)
     {
         // stop rolling
-        // app_window_ptr->stop_rolling();
+        app_window_ptr->stop_rolling();
     }
-    return CallNextHookEx(keyHook, nCode, wParam, lParam);
+    return CallNextHookEx(app_window_ptr->get_hook_handle(), nCode, wParam, lParam);
 }
 
 LRESULT CALLBACK main_window::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
@@ -45,13 +44,16 @@ LRESULT CALLBACK main_window::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LP
     }
 }
 
-main_window::main_window(HINSTANCE hInstance) : h_instance(hInstance)
+main_window::main_window(HINSTANCE hInstance) : h_instance(hInstance), is_rolling(false), is_running(true)
 {
 }
 
 main_window::~main_window()
 {
-    // UnhookWindowsHookEx(keyHook);
+    is_rolling = false;
+    is_running = false;
+    UnhookWindowsHookEx(keyHook);
+    rolling_thread.join();
 }
 
 BOOL main_window::create(PCWSTR lpWindowName, DWORD dwStyle, DWORD dwExStyle, int x, int y, int nWidth, int nHeight, HWND hWndParent, HMENU hMenu)
@@ -78,13 +80,15 @@ BOOL main_window::create(PCWSTR lpWindowName, DWORD dwStyle, DWORD dwExStyle, in
         dwExStyle, class_name(), lpWindowName, dwStyle, x, y,
         rect_size.right - rect_size.left, rect_size.bottom - rect_size.top, hWndParent, hMenu, h_instance, this);
 
-    // keyHook = SetWindowsHookEx(WH_KEYBOARD_LL, main_window::keyProc, nullptr, 0);
+    keyHook = SetWindowsHookEx(WH_KEYBOARD_LL, main_window::keyProc, nullptr, 0);
 
     if (ocr.Init("./tessdata", "chi_sim"))
     {
         MessageBox(h_main_window, L"Init tesseract failed!", L"info", MB_OK);
         PostQuitMessage(0);
     }
+
+    rolling_thread = std::thread(&main_window::rolling, this);
 
     return (h_main_window ? TRUE : FALSE);
 }
@@ -184,84 +188,107 @@ LRESULT main_window::handle_message(UINT uMsg, WPARAM wParam, LPARAM lParam)
     return DefWindowProc(h_main_window, uMsg, wParam, lParam);
 }
 
-void main_window::on_start_button_click()
+void main_window::stop_rolling()
 {
-    // SetWindowText(h_start_button, L"Pause (ESC)");
+    is_rolling = false;
+    SetWindowText(h_start_button, L"START");
+}
 
-    HDC hdc = GetDC(NULL);
-
-    // int screenx = GetSystemMetrics(SM_CXSCREEN);
-    // int screeny = GetSystemMetrics(SM_CYSCREEN);
-
-    HBITMAP hBitmap = CreateCompatibleBitmap(hdc, t_w, t_h);
-    HDC hdcMem = CreateCompatibleDC(hdc);
-
-    SelectObject(hdcMem, hBitmap);
-    BitBlt(hdcMem, 0, 0, t_w, t_h, hdc, t_x, t_y, SRCCOPY);
-
-    BITMAP bm;
-    GetObject(hBitmap, sizeof(bm), &bm);
-
-    auto size = bm.bmHeight * bm.bmWidthBytes;
-
-    auto buffer = std::make_unique<unsigned char[]>(size);
-
-    auto retv = GetBitmapBits(hBitmap, size, buffer.get());
-
-    // note: 24bit bmp image
-    // HBITMAP hBitmap = reinterpret_cast<HBITMAP>(LoadImage(NULL, L"m.bmp", IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE));
-
-    // convert 32bit bitmap to 1 bit gray image in image_bits
-    // there is a problem during transform 32bit bitmap to 1 bit gray image
-    for (std::size_t row = 0; row < bm.bmHeight; row++)
+void main_window::rolling()
+{
+    while (is_running)
     {
-        for (std::size_t col = 0; col < bm.bmWidth; col++)
+        if (is_rolling == false)
         {
-            auto source_index = row * bm.bmWidthBytes + col * bm.bmBitsPixel / 8;
-            auto r = buffer[source_index];
-            auto g = buffer[source_index + 1];
-            auto b = buffer[source_index + 2];
+            std::this_thread::yield();
+        }
+        else
+        {
+            HDC hdc = GetDC(NULL);
 
-            auto target_index_x = col % 8;
-            if (0.3f * r + 0.59f * g + 0.11f * b > 75.0f)
+            // int screenx = GetSystemMetrics(SM_CXSCREEN);
+            // int screeny = GetSystemMetrics(SM_CYSCREEN);
+
+            HBITMAP hBitmap = CreateCompatibleBitmap(hdc, t_w, t_h);
+            HDC hdcMem = CreateCompatibleDC(hdc);
+
+            SelectObject(hdcMem, hBitmap);
+            BitBlt(hdcMem, 0, 0, t_w, t_h, hdc, t_x, t_y, SRCCOPY);
+
+            BITMAP bm;
+            GetObject(hBitmap, sizeof(bm), &bm);
+
+            auto size = bm.bmHeight * bm.bmWidthBytes;
+
+            auto buffer = std::make_unique<unsigned char[]>(size);
+
+            auto retv = GetBitmapBits(hBitmap, size, buffer.get());
+
+            // note: 24bit bmp image
+            // HBITMAP hBitmap = reinterpret_cast<HBITMAP>(LoadImage(NULL, L"m.bmp", IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE));
+
+            // convert 32bit bitmap to 1 bit gray image in image_bits
+            // there is a problem during transform 32bit bitmap to 1 bit gray image
+            for (std::size_t row = 0; row < bm.bmHeight; row++)
             {
-                image_bits.at(row).at(col / 8) |= 0x00000001 << (7 - target_index_x);
+                for (std::size_t col = 0; col < bm.bmWidth; col++)
+                {
+                    auto source_index = row * bm.bmWidthBytes + col * bm.bmBitsPixel / 8;
+                    auto r = buffer[source_index];
+                    auto g = buffer[source_index + 1];
+                    auto b = buffer[source_index + 2];
+
+                    auto target_index_x = col % 8;
+                    if (0.3f * r + 0.59f * g + 0.11f * b > 75.0f)
+                    {
+                        image_bits.at(row).at(col / 8) |= 0x00000001 << (7 - target_index_x);
+                    }
+                    else
+                    {
+                        image_bits.at(row).at(col / 8) &= 0x00000001 << (7 - target_index_x) ^ 0x11111111;
+                    }
+                }
             }
-            else
+
+            // create preview image handle
+            HBITMAP preview_image = CreateBitmap(t_w, t_h, 1, 1, image_bits.data()->data());
+
+            HBITMAP hold = reinterpret_cast<HBITMAP>(SendMessage(h_preview_box, STM_SETIMAGE, IMAGE_BITMAP, reinterpret_cast<LPARAM>(preview_image)));
+
+            // delete the old image
+            if (hold && hold != preview_image)
             {
-                image_bits.at(row).at(col / 8) &= 0x00000001 << (7 - target_index_x) ^ 0x11111111;
+                DeleteObject(hold);
             }
+
+            ocr.SetImage(buffer.get(), t_w, t_h, 4, 800);
+            std::unique_ptr<char[]> utf8_text(ocr.GetUTF8Text());
+
+            std::ofstream log_file;
+            log_file.open("output.log", std::ios::app);
+            log_file << utf8_text << std::endl;
+            log_file.close();
+
+            // convert UTF8 text to wide char, and report ocr result in text box
+            int wide_str_len = MultiByteToWideChar(CP_UTF8, 0, utf8_text.get(), static_cast<int>(strlen(utf8_text.get())), nullptr, 0);
+            std::unique_ptr<wchar_t[]> wide_str = std::make_unique<wchar_t[]>(wide_str_len + 1);
+            MultiByteToWideChar(CP_UTF8, 0, utf8_text.get(), static_cast<int>(strlen(utf8_text.get())), wide_str.get(), wide_str_len);
+            wide_str[wide_str_len] = '\0';
+
+            SetWindowText(h_text_box, wide_str.get());
+
+            DeleteObject(hBitmap);
+            ReleaseDC(h_main_window, hdcMem);
+            ReleaseDC(h_main_window, hdc);
         }
     }
+}
 
-    // create preview image handle
-    HBITMAP preview_image = CreateBitmap(t_w, t_h, 1, 1, image_bits.data()->data());
-
-    HBITMAP hold = reinterpret_cast<HBITMAP>(SendMessage(h_preview_box, STM_SETIMAGE, IMAGE_BITMAP, reinterpret_cast<LPARAM>(preview_image)));
-
-    // delete the old image
-    if (hold && hold != preview_image)
+void main_window::on_start_button_click()
+{
+    if (is_rolling == false)
     {
-        DeleteObject(hold);
+        is_rolling = true;
+        SetWindowText(h_start_button, L"Pause (ESC)");
     }
-
-    ocr.SetImage(buffer.get(), t_w, t_h, 4, 800);
-    std::unique_ptr<char[]> utf8_text(ocr.GetUTF8Text());
-
-    std::ofstream log_file;
-    log_file.open("output.log", std::ios::app);
-    log_file << utf8_text << std::endl;
-    log_file.close();
-
-    // convert UTF8 text to wide char, and report ocr result in text box
-    int wcscLen = MultiByteToWideChar(CP_UTF8, 0, utf8_text.get(), static_cast<int>(strlen(utf8_text.get())), nullptr, 0);
-    std::unique_ptr<wchar_t[]> wszcString = std::make_unique<wchar_t[]>(wcscLen + 1);
-    MultiByteToWideChar(CP_UTF8, 0, utf8_text.get(), static_cast<int>(strlen(utf8_text.get())), wszcString.get(), wcscLen);
-    wszcString[wcscLen] = '\0';
-
-    SetWindowText(h_text_box, wszcString.get());
-
-    DeleteObject(hBitmap);
-    ReleaseDC(h_main_window, hdcMem);
-    ReleaseDC(h_main_window, hdc);
 }
