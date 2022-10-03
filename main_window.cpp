@@ -1,7 +1,7 @@
 ﻿#include "main_window.h"
 
-#include <memory>
 #include <fstream>
+#include <memory>
 
 extern main_window *app_window_ptr;
 
@@ -56,7 +56,8 @@ main_window::~main_window()
     rolling_thread.join();
 }
 
-BOOL main_window::create(PCWSTR lpWindowName, DWORD dwStyle, DWORD dwExStyle, int x, int y, int nWidth, int nHeight, HWND hWndParent, HMENU hMenu)
+BOOL main_window::create(PCWSTR lpWindowName, DWORD dwStyle, DWORD dwExStyle, int x, int y, int nWidth, int nHeight,
+                         HWND hWndParent, HMENU hMenu)
 {
     WNDCLASS wc = {0};
 
@@ -76,9 +77,9 @@ BOOL main_window::create(PCWSTR lpWindowName, DWORD dwStyle, DWORD dwExStyle, in
 
     AdjustWindowRect(&rect_size, dwStyle, hMenu != nullptr);
 
-    h_main_window = CreateWindowEx(
-        dwExStyle, class_name(), lpWindowName, dwStyle, x, y,
-        rect_size.right - rect_size.left, rect_size.bottom - rect_size.top, hWndParent, hMenu, h_instance, this);
+    h_main_window =
+        CreateWindowEx(dwExStyle, class_name(), lpWindowName, dwStyle, x, y, rect_size.right - rect_size.left,
+                       rect_size.bottom - rect_size.top, hWndParent, hMenu, h_instance, this);
 
     keyHook = SetWindowsHookEx(WH_KEYBOARD_LL, main_window::keyProc, nullptr, 0);
 
@@ -95,57 +96,43 @@ BOOL main_window::create(PCWSTR lpWindowName, DWORD dwStyle, DWORD dwExStyle, in
 
 void main_window::setup_ui()
 {
-    h_preview_box = CreateWindow(
-        L"STATIC",
-        nullptr,
-        WS_VISIBLE | WS_CHILD | WS_BORDER | SS_BITMAP, // Styles
-        pre_box_x,                                     // x position
-        pre_box_y,                                     // y position
-        pre_box_w,                                     // width
-        pre_box_h,                                     // height
-        h_main_window,                                 // Parent window
-        reinterpret_cast<HMENU>(preview_box),
-        h_instance,
-        nullptr);
+    h_preview_box = CreateWindow(L"STATIC", nullptr,
+                                 WS_VISIBLE | WS_CHILD | WS_BORDER | SS_BITMAP, // Styles
+                                 pre_box_x,                                     // x position
+                                 pre_box_y,                                     // y position
+                                 pre_box_w,                                     // width
+                                 pre_box_h,                                     // height
+                                 h_main_window,                                 // Parent window
+                                 reinterpret_cast<HMENU>(preview_box), h_instance, nullptr);
 
-    h_text_box = CreateWindow(
-        L"STATIC",
-        L"Result ...",
-        WS_VISIBLE | WS_CHILD | WS_BORDER, // Styles
-        pre_box_x,                         // x position
-        pre_box_y + pre_box_h + 10,        // y position
-        pre_box_w,                         // width
-        pre_box_h,                         // height
-        h_main_window,                     // Parent window
-        nullptr,
-        h_instance,
-        nullptr);
+    h_text_box = CreateWindow(L"STATIC", L"Result ...",
+                              WS_VISIBLE | WS_CHILD | WS_BORDER, // Styles
+                              pre_box_x,                         // x position
+                              pre_box_y + pre_box_h + 10,        // y position
+                              pre_box_w,                         // width
+                              pre_box_h,                         // height
+                              h_main_window,                     // Parent window
+                              nullptr, h_instance, nullptr);
 
-    h_start_button = CreateWindow(
-        L"BUTTON",                             // Predefined class; Unicode assumed
-        L"START",                              // Button text
-        WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON, // Styles
-        btn_x,                                 // x position
-        btn_y,                                 // y position
-        btn_w,                                 // Button width
-        btn_h,                                 // Button height
-        h_main_window,                         // Parent window
-        reinterpret_cast<HMENU>(start_button),
-        h_instance,
-        nullptr);
+    h_start_button = CreateWindow(L"BUTTON",                             // Predefined class; Unicode assumed
+                                  L"START",                              // Button text
+                                  WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON, // Styles
+                                  btn_x,                                 // x position
+                                  btn_y,                                 // y position
+                                  btn_w,                                 // Button width
+                                  btn_h,                                 // Button height
+                                  h_main_window,                         // Parent window
+                                  reinterpret_cast<HMENU>(start_button), h_instance, nullptr);
 
-    h_close_button = CreateWindow(
-        L"BUTTON",                             // Predefined class; Unicode assumed
-        L"CLOSE",                              // Button text
-        WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON, // Styles
-        btn_x + btn_w + 20,                    // x position
-        btn_y,                                 // y position
-        btn_w,                                 // Button width
-        btn_h,                                 // Button height
-        h_main_window,                         // Parent window
-        reinterpret_cast<HMENU>(close_button),
-        h_instance,
-        nullptr);
+    h_close_button = CreateWindow(L"BUTTON",                             // Predefined class; Unicode assumed
+                                  L"CLOSE",                              // Button text
+                                  WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON, // Styles
+                                  btn_x + btn_w + 20,                    // x position
+                                  btn_y,                                 // y position
+                                  btn_w,                                 // Button width
+                                  btn_h,                                 // Button height
+                                  h_main_window,                         // Parent window
+                                  reinterpret_cast<HMENU>(close_button), h_instance, nullptr);
 }
 
 LRESULT main_window::handle_message(UINT uMsg, WPARAM wParam, LPARAM lParam)
@@ -154,23 +141,22 @@ LRESULT main_window::handle_message(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
     case WM_CREATE:
         setup_ui();
-        return 0;
+        break;
 
     case WM_DESTROY:
         PostQuitMessage(0);
-        return 0;
+        break;
 
-    case WM_PAINT:
-    {
-        PAINTSTRUCT ps;
-        HDC hdc = BeginPaint(h_main_window, &ps);
-        // FillRect(hdc, &ps.rcPaint, (HBRUSH)(COLOR_GRAYTEXT + 1));
-        EndPaint(h_main_window, &ps);
-        return 0;
-    }
+        // case WM_PAINT:
+        // {
+        //     PAINTSTRUCT ps;
+        //     HDC hdc = BeginPaint(h_main_window, &ps);
+        //     FillRect(hdc, &ps.rcPaint, (HBRUSH)(COLOR_GRAYTEXT + 1));
+        //     EndPaint(h_main_window, &ps);
+        //     break;
+        // }
 
-    case WM_COMMAND:
-    {
+    case WM_COMMAND: {
         if (LOWORD(wParam) == start_button)
         {
             on_start_button_click();
@@ -179,7 +165,7 @@ LRESULT main_window::handle_message(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
             PostQuitMessage(0);
         }
-        return 0;
+        break;
     }
 
     default:
@@ -225,7 +211,8 @@ void main_window::rolling()
             auto retv = GetBitmapBits(hBitmap, size, buffer.get());
 
             // note: 24bit bmp image
-            // HBITMAP hBitmap = reinterpret_cast<HBITMAP>(LoadImage(NULL, L"m.bmp", IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE));
+            // HBITMAP hBitmap = reinterpret_cast<HBITMAP>(LoadImage(NULL, L"m.bmp", IMAGE_BITMAP, 0, 0,
+            // LR_LOADFROMFILE));
 
             // convert 32bit bitmap to 1 bit gray image in image_bits
             // there is a problem during transform 32bit bitmap to 1 bit gray image
@@ -253,7 +240,8 @@ void main_window::rolling()
             // create preview image handle
             HBITMAP preview_image = CreateBitmap(t_w, t_h, 1, 1, image_bits.data()->data());
 
-            HBITMAP hold = reinterpret_cast<HBITMAP>(SendMessage(h_preview_box, STM_SETIMAGE, IMAGE_BITMAP, reinterpret_cast<LPARAM>(preview_image)));
+            HBITMAP hold = reinterpret_cast<HBITMAP>(
+                SendMessage(h_preview_box, STM_SETIMAGE, IMAGE_BITMAP, reinterpret_cast<LPARAM>(preview_image)));
 
             // delete the old image
             if (hold && hold != preview_image)
@@ -270,9 +258,11 @@ void main_window::rolling()
             log_file.close();
 
             // convert UTF8 text to wide char, and report ocr result in text box
-            int wide_str_len = MultiByteToWideChar(CP_UTF8, 0, utf8_text.get(), static_cast<int>(strlen(utf8_text.get())), nullptr, 0);
+            int wide_str_len =
+                MultiByteToWideChar(CP_UTF8, 0, utf8_text.get(), static_cast<int>(strlen(utf8_text.get())), nullptr, 0);
             std::unique_ptr<wchar_t[]> wide_str = std::make_unique<wchar_t[]>(wide_str_len + 1);
-            MultiByteToWideChar(CP_UTF8, 0, utf8_text.get(), static_cast<int>(strlen(utf8_text.get())), wide_str.get(), wide_str_len);
+            MultiByteToWideChar(CP_UTF8, 0, utf8_text.get(), static_cast<int>(strlen(utf8_text.get())), wide_str.get(),
+                                wide_str_len);
             wide_str[wide_str_len] = '\0';
 
             SetWindowText(h_text_box, wide_str.get());
@@ -290,5 +280,9 @@ void main_window::on_start_button_click()
     {
         is_rolling = true;
         SetWindowText(h_start_button, L"Pause (ESC)");
+    }
+    else
+    {
+        stop_rolling();
     }
 }

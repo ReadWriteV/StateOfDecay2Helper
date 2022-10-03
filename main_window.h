@@ -6,7 +6,6 @@
 
 #include <array>
 #include <thread>
-#include <atomic>
 
 // define region
 constexpr int t_x = 1580, t_y = 290, t_w = 200, t_h = 125;
@@ -33,7 +32,7 @@ constexpr WORD preview_box = 1003;
  */
 class main_window
 {
-public:
+  public:
     static LRESULT CALLBACK keyProc(int nCode, WPARAM wParam, LPARAM lParam);
 
     static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
@@ -42,29 +41,41 @@ public:
 
     ~main_window();
 
-    BOOL create(PCWSTR lpWindowName, DWORD dwStyle = WS_SYSMENU | WS_CAPTION & ~WS_MINIMIZEBOX, DWORD dwExStyle = WS_EX_TOPMOST,
-                int x = CW_USEDEFAULT, int y = CW_USEDEFAULT,
-                int nWidth = client_width, int nHeight = client_height,
-                HWND hWndParent = nullptr, HMENU hMenu = nullptr);
+    BOOL create(PCWSTR lpWindowName, DWORD dwStyle = WS_SYSMENU | WS_CAPTION & ~WS_MINIMIZEBOX,
+                DWORD dwExStyle = WS_EX_TOPMOST, int x = CW_USEDEFAULT, int y = CW_USEDEFAULT,
+                int nWidth = client_width, int nHeight = client_height, HWND hWndParent = nullptr,
+                HMENU hMenu = nullptr);
 
-    HWND get_window_handle() const { return h_main_window; }
-    HHOOK get_hook_handle() const { return keyHook; }
+    HWND get_window_handle() const
+    {
+        return h_main_window;
+    }
+    HHOOK get_hook_handle() const
+    {
+        return keyHook;
+    }
 
-    BOOL show_window(INT nCmdShow) const { return ShowWindow(h_main_window, nCmdShow); }
+    BOOL show_window(INT nCmdShow) const
+    {
+        return ShowWindow(h_main_window, nCmdShow);
+    }
 
     void stop_rolling();
 
-protected:
+  protected:
     void on_start_button_click();
 
     void setup_ui();
 
     void rolling();
 
-    inline PCWSTR class_name() const { return L"State of Decay Helper"; }
+    inline PCWSTR class_name() const
+    {
+        return L"State of Decay Helper";
+    }
     LRESULT handle_message(UINT uMsg, WPARAM wParam, LPARAM lParam);
 
-private:
+  private:
     HINSTANCE h_instance;
 
     HWND h_main_window;
@@ -76,8 +87,8 @@ private:
 
     HHOOK keyHook;
 
-    std::atomic_bool is_rolling;
-    std::atomic_bool is_running;
+    bool is_rolling;
+    bool is_running;
     std::thread rolling_thread;
     tesseract::TessBaseAPI ocr;
 
