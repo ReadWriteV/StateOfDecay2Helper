@@ -7,10 +7,13 @@
 #include <array>
 #include <thread>
 
-// define region
-constexpr int t_x = 1580, t_y = 290, t_w = 200, t_h = 125;
+// define region, top-left point and width, height
+// constexpr int t_x = 1580, t_y = 290, t_w = 200, t_h = 125; // Before V30
+constexpr int t_x = 1255, t_y = 360, t_w = 200, t_h = 70; // After V30
+
 // refresh button position
-constexpr int p_x = 1572, p_y = 804;
+// constexpr int p_x = 1572, p_y = 804; // // Before V30
+// After V30, use key T to refresh
 
 // client width and height
 constexpr int client_width = 300, client_height = 400;
@@ -32,65 +35,66 @@ constexpr WORD preview_box = 1003;
  */
 class main_window
 {
-  public:
-    static LRESULT CALLBACK keyProc(int nCode, WPARAM wParam, LPARAM lParam);
+public:
+  static LRESULT CALLBACK keyProc(int nCode, WPARAM wParam, LPARAM lParam);
 
-    static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+  static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
-    main_window(HINSTANCE hInstance);
+  main_window(HINSTANCE hInstance);
 
-    ~main_window();
+  ~main_window();
 
-    BOOL create(PCWSTR lpWindowName, DWORD dwStyle = WS_SYSMENU | WS_CAPTION & ~WS_MINIMIZEBOX,
-                DWORD dwExStyle = WS_EX_TOPMOST, int x = CW_USEDEFAULT, int y = CW_USEDEFAULT,
-                int nWidth = client_width, int nHeight = client_height, HWND hWndParent = nullptr,
-                HMENU hMenu = nullptr);
+  BOOL create(PCWSTR lpWindowName, DWORD dwStyle = WS_SYSMENU | WS_CAPTION & ~WS_MINIMIZEBOX,
+              DWORD dwExStyle = WS_EX_TOPMOST, int x = CW_USEDEFAULT, int y = CW_USEDEFAULT,
+              int nWidth = client_width, int nHeight = client_height, HWND hWndParent = nullptr,
+              HMENU hMenu = nullptr);
 
-    HWND get_window_handle() const
-    {
-        return h_main_window;
-    }
-    HHOOK get_hook_handle() const
-    {
-        return keyHook;
-    }
+  HWND get_window_handle() const
+  {
+    return h_main_window;
+  }
+  HHOOK get_hook_handle() const
+  {
+    return keyHook;
+  }
 
-    BOOL show_window(INT nCmdShow) const
-    {
-        return ShowWindow(h_main_window, nCmdShow);
-    }
+  BOOL show_window(INT nCmdShow) const
+  {
+    return ShowWindow(h_main_window, nCmdShow);
+  }
 
-    void stop_rolling();
+  void stop_rolling();
 
-  protected:
-    void on_start_button_click();
+protected:
+  void on_start_button_click();
+  void on_close_button_click();
 
-    void setup_ui();
+  void setup_ui();
 
-    void rolling();
+  void rolling();
 
-    inline PCWSTR class_name() const
-    {
-        return L"State of Decay Helper";
-    }
-    LRESULT handle_message(UINT uMsg, WPARAM wParam, LPARAM lParam);
+  inline PCWSTR class_name() const
+  {
+    return L"State of Decay Helper";
+  }
+  LRESULT handle_message(UINT uMsg, WPARAM wParam, LPARAM lParam);
 
-  private:
-    HINSTANCE h_instance;
+private:
+  HINSTANCE h_instance;
 
-    HWND h_main_window;
-    HWND h_start_button;
-    HWND h_close_button;
+  HWND h_main_window;
+  HWND h_start_button;
+  HWND h_close_button;
 
-    HWND h_preview_box;
-    HWND h_text_box;
+  HWND h_preview_box;
+  HWND h_text_box;
 
-    HHOOK keyHook;
+  HHOOK keyHook;
 
-    bool is_rolling;
-    bool is_running;
-    std::thread rolling_thread;
-    tesseract::TessBaseAPI ocr;
+  bool is_rolling;
+  bool is_running;
+  std::thread rolling_thread;
+  tesseract::TessBaseAPI ocr;
 
-    std::array<std::array<unsigned char, t_w / 8 + 1>, t_h> image_bits;
+  std::array<std::array<unsigned char, t_w / 8 + 1>, t_h> image_bits;
 };

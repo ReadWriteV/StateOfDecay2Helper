@@ -1,7 +1,8 @@
 ﻿#include "main_window.h"
 
-#include <fstream>
 #include <memory>
+#include <cassert>
+#include <string>
 
 extern main_window *app_window_ptr;
 
@@ -156,14 +157,15 @@ LRESULT main_window::handle_message(UINT uMsg, WPARAM wParam, LPARAM lParam)
         //     break;
         // }
 
-    case WM_COMMAND: {
+    case WM_COMMAND:
+    {
         if (LOWORD(wParam) == start_button)
         {
             on_start_button_click();
         }
         else if (LOWORD(wParam) == close_button)
         {
-            PostQuitMessage(0);
+            on_close_button_click();
         }
         break;
     }
@@ -208,7 +210,7 @@ void main_window::rolling()
 
             auto buffer = std::make_unique<unsigned char[]>(size);
 
-            auto retv = GetBitmapBits(hBitmap, size, buffer.get());
+            GetBitmapBits(hBitmap, size, buffer.get());
 
             // note: 24bit bmp image
             // HBITMAP hBitmap = reinterpret_cast<HBITMAP>(LoadImage(NULL, L"m.bmp", IMAGE_BITMAP, 0, 0,
@@ -239,6 +241,7 @@ void main_window::rolling()
 
             // create preview image handle
             HBITMAP preview_image = CreateBitmap(t_w, t_h, 1, 1, image_bits.data()->data());
+            assert(preview_image != nullptr);
 
             HBITMAP hold = reinterpret_cast<HBITMAP>(
                 SendMessage(h_preview_box, STM_SETIMAGE, IMAGE_BITMAP, reinterpret_cast<LPARAM>(preview_image)));
@@ -252,11 +255,6 @@ void main_window::rolling()
             ocr.SetImage(buffer.get(), t_w, t_h, 4, 800);
             std::unique_ptr<char[]> utf8_text(ocr.GetUTF8Text());
 
-            std::ofstream log_file;
-            log_file.open("output.log", std::ios::app);
-            log_file << utf8_text << std::endl;
-            log_file.close();
-
             // convert UTF8 text to wide char, and report ocr result in text box
             int wide_str_len =
                 MultiByteToWideChar(CP_UTF8, 0, utf8_text.get(), static_cast<int>(strlen(utf8_text.get())), nullptr, 0);
@@ -266,6 +264,21 @@ void main_window::rolling()
             wide_str[wide_str_len] = '\0';
 
             SetWindowText(h_text_box, wide_str.get());
+
+            if (std::wstring(wide_str.get()).find(L"血疫幸存者") == std::wstring::npos)
+            {
+                INPUT press_key_t[2] = {};
+                press_key_t[0].type = INPUT_KEYBOARD;
+                press_key_t[0].ki.wVk = 'T';
+                press_key_t[1].type = INPUT_KEYBOARD;
+                press_key_t[1].ki.wVk = 'T';
+                press_key_t[1].ki.dwFlags = KEYEVENTF_KEYUP;
+                auto send = SendInput(ARRAYSIZE(press_key_t), press_key_t, sizeof(INPUT));
+            }
+            else
+            {
+                stop_rolling();
+            }
 
             DeleteObject(hBitmap);
             ReleaseDC(h_main_window, hdcMem);
@@ -285,4 +298,11 @@ void main_window::on_start_button_click()
     {
         stop_rolling();
     }
+}
+
+void main_window::on_close_button_click()
+{
+    is_rolling = false;
+    is_running = false;
+    PostQuitMessage(0);
 }
